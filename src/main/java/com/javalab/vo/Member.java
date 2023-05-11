@@ -22,6 +22,14 @@ public class Member {
 		this.id = id;
 		this.pwd = pwd;
 	}
+	
+	public Member(String id, String pwd, String name, String email) {
+		super();
+		this.id = id;
+		this.pwd = pwd;
+		this.name = name;
+		this.email = email;
+	}
 
 	public Member(String id, String pwd, String name, String email, String joindate) {
 		super();

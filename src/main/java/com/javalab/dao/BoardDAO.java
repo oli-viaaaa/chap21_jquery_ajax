@@ -1,11 +1,13 @@
 package com.javalab.dao;
 
 import java.sql.Connection;
+
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLClientInfoException;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.List;
 
 import javax.naming.Context;
 import javax.naming.InitialContext;
@@ -38,51 +40,67 @@ public class BoardDAO {
 	}	
 	
 	// 게시물 목록 조회 메소드
-	public ArrayList<BoardVo> getBoardList() {
-
-		ArrayList<BoardVo> boardList = new ArrayList<BoardVo>();
-		try {
-			con = dataSource.getConnection();	//커넥션 객체 얻기
-
-			StringBuffer query = new StringBuffer();
-			query.append("select no, title, content, id, hit, regdate, reply_group, reply_order, reply_indent ");			
-			query.append("from( ");			
-			query.append("     select rownum rnum, no, title, content, id, hit, regdate, reply_group, reply_order, reply_indent");			
-			query.append("     from (");			
-			query.append("		select no, title, content, id, hit, regdate, reply_group, reply_order, reply_indent");			
-			query.append("		from tbl_board");			
-			query.append("		order by reply_group desc, reply_order, reply_indent asc");			
-			query.append("     )");			
-			query.append(")");			
-			//sql.append("where rnum >= 1 and rnum <=10"); // 페이징에서 필요			
+	public List<BoardVo> getBoardList(int pageNum) {
+	      
+	      List<BoardVo> boardList = new ArrayList<BoardVo>();
+	      
+	      StringBuffer query = new StringBuffer();
+	      
+	      int start = 0;   // 시작번호 초기화
+	      int end = 0;   // 끝번호 초기화
+	      
+	      /*
+	       * [공식]
+	       * 시작번호 : (요청된 페이지 - 1) * 한페이지에 보여줄수 + 1
+	       * 끝번호 : 시작번호 + 한페이지에 보여줄수 - 1 
+	       * 한페이지에 보여줄 게시물 수는 10개로 가정
+	       * 
+	       */
+	      start = (pageNum - 1) * 10 + 1;
+	      end = start + 10 - 1;
+	      
+	      // [디버깅]
+	      System.out.println("시작게시물번호start : " + start + " / 끝 게시물번호end : " + end);
+	      
+	      // [2. 방법] row_number()함수 사용 - 게시물 번호로 역순 정렬
+	      query.append("select no, title, content, id, hit, regdate, reply_group, reply_order, reply_indent ");
+	      query.append(" from( ");
+	      query.append("   select b.*, row_number() over(order by b.no asc) row_num");
+	      query.append("     from tbl_board b");
+	      query.append(")a");
+	      query.append(" where a.row_num between ? And ?");
+	      try {
+	         //커넥션 객체 얻기
+	         con = dataSource.getConnection();   
+	         pstmt = con.prepareStatement(query.toString());
+	         pstmt.setInt(1, start);   // 시작번호
+	         pstmt.setInt(2, end);   // 끝번호
+	         
+	         rs = pstmt.executeQuery();
+	         BoardVo model = null;
+	         while(rs.next()) {
+	            model = new BoardVo();
+	            
+	            model.setNo(rs.getInt("no"));
+	            model.setTitle(rs.getString("title"));
+	            model.setId(rs.getString("id"));
+	            model.setHit(rs.getInt("hit"));
+	            model.setRegdate(rs.getString("regdate"));
+	            //model.setReply_group(rs.getInt("reply_group"));
+	            //model.setReply_order(rs.getInt("reply_order"));
+	            //model.setReply_indent(rs.getInt("reply_indent"));
+	            
+	            boardList.add(model);
+	         }
+	      } catch (SQLException e) {
+	         e.printStackTrace();
+	      } finally {
+	         close();
+	      }
+	      return boardList;
+	   }   
 			
-			System.out.println("SQL :  " + query.toString());
 			
-			pstmt = con.prepareStatement(query.toString());
-			rs = pstmt.executeQuery();
-			
-			BoardVo board = null;
-			while(rs.next()) {
-				board = new BoardVo();
-				
-				board.setNo(rs.getInt("no"));
-				board.setTitle(rs.getString("title"));
-				board.setId(rs.getString("id"));
-				board.setHit(rs.getInt("hit"));
-				board.setRegdate(rs.getString("regdate"));
-				board.setReply_group(rs.getInt("reply_group"));
-				board.setReply_order(rs.getInt("reply_order"));
-				board.setReply_indent(rs.getInt("reply_indent"));
-				
-				boardList.add(board);
-			}
-		} catch (Exception e) {
-			e.printStackTrace();
-		} finally {
-			close();			
-		}
-		return boardList;
-	}
 
 	// 게시물 삭제 메소드
 	public int deleteBoard(int no) {
